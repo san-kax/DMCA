@@ -1,7 +1,5 @@
 import asyncio
 import os
-import subprocess
-import sys
 from datetime import date
 
 import nest_asyncio
@@ -10,10 +8,7 @@ import streamlit as st
 
 nest_asyncio.apply()
 
-# Pin browser path to /tmp so install and launch always agree on location
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/tmp/ms-playwright"
-
-# ── Page config ──────────────────────────────────────────────────────────────
+# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="DMCA Monitor",
     page_icon="shield",
@@ -21,21 +16,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Install Playwright Chromium on first run (Streamlit Cloud) ───────────────
-@st.cache_resource(show_spinner="Installing browser (first run only)...")
-def install_playwright():
-    env = {**os.environ, "PLAYWRIGHT_BROWSERS_PATH": "/tmp/ms-playwright"}
-    subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "chromium"],
-        capture_output=True,
-        env=env,
-    )
-
-install_playwright()
-
-from checker import _check_url_with_browser          # noqa: E402  (after install)
-from counter_notice import generate_counter_notice    # noqa: E402
-from playwright.async_api import async_playwright     # noqa: E402
+from checker import check_single_url          # noqa: E402
+from counter_notice import generate_counter_notice  # noqa: E402
 
 # ── Sidebar – company info ────────────────────────────────────────────────────
 with st.sidebar:
@@ -46,11 +28,11 @@ with st.sidebar:
     company_phone   = st.text_input("Phone",         value="+353 1 903 8375")
     company_email   = st.text_input("Email",         value="sandeep.kumar@gdcgroup.com")
     st.divider()
-    st.caption("Powered by Google Direct Search & Lumen Database")
+    st.caption("Powered by SerpAPI & Lumen Database")
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("DMCA Monitor")
-st.caption("URL Index & Takedown Checker — checks real Google search results")
+st.caption("URL Index & Takedown Checker — powered by SerpAPI & Lumen Database")
 
 st.divider()
 
@@ -89,7 +71,7 @@ seen: set = set()
 urls = [u for u in urls if not (u in seen or seen.add(u))]
 
 if urls:
-    st.info(f"**{len(urls)} URLs** loaded — estimated time: ~{len(urls) * 13 // 60} min {(len(urls) * 13) % 60} sec")
+    st.info(f"**{len(urls)} URLs** loaded — estimated time: ~{len(urls) * 5 // 60} min {(len(urls) * 5) % 60} sec")
 
 st.divider()
 
@@ -98,13 +80,13 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
 
     results: list[dict] = []
 
-    progress_bar  = st.progress(0, text="Starting browser...")
-    status_text   = st.empty()
+    progress_bar = st.progress(0, text="Starting...")
+    status_text  = st.empty()
 
     c1, c2, c3 = st.columns(3)
-    box_total    = c1.empty()
-    box_indexed  = c2.empty()
-    box_notices  = c3.empty()
+    box_total   = c1.empty()
+    box_indexed = c2.empty()
+    box_notices = c3.empty()
 
     table_placeholder = st.empty()
 
@@ -122,45 +104,24 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
                 str(n["id"]) for n in r["notices"] if n.get("id")
             ) or ("Yes" if r["notices"] else "—")
             rows.append({
-                "#":             idx,
-                "URL":           r["url"],
-                "Indexed":       "Yes" if r["indexed"] else "No",
-                "DMCA Notices":  notice_ids,
-                "Error":         (r.get("indexed_error") or "")[:80],
+                "#":            idx,
+                "URL":          r["url"],
+                "Indexed":      "Yes" if r["indexed"] else "No",
+                "DMCA Notices": notice_ids,
+                "Error":        (r.get("indexed_error") or "")[:80],
             })
-        df_display = pd.DataFrame(rows)
-        table_placeholder.dataframe(df_display, use_container_width=True, hide_index=True)
+        table_placeholder.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-    # ── Async browser check ───────────────────────────────────────────────────
-    async def run_checks():
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                ],
-            )
-            total = len(urls)
-            for i, url in enumerate(urls):
-                result = await _check_url_with_browser(url, browser)
-                results.append(result)
+    total = len(urls)
+    for i, url in enumerate(urls):
+        status_text.caption(f"Checking: {url}")
+        result = check_single_url(url)
+        results.append(result)
 
-                pct = len(results) / total
-                progress_bar.progress(pct, text=f"Checking {len(results)} / {total}...")
-                status_text.caption(f"Last: {url}")
-                refresh_stats()
-                refresh_table()
-
-                if i + 1 < total:
-                    await asyncio.sleep(3)
-
-            await browser.close()
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_checks())
+        pct = len(results) / total
+        progress_bar.progress(pct, text=f"Checking {len(results)} / {total}...")
+        refresh_stats()
+        refresh_table()
 
     progress_bar.progress(1.0, text="Complete!")
     status_text.empty()
@@ -179,7 +140,7 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
                     if notice.get("lumen_url"):
                         st.write(f"**Lumen Record:** {notice['lumen_url']}")
                     if notice.get("content"):
-                        st.write(f"**Notice text:** {notice['content']}")
+                        st.write(f"**Notice title:** {notice['content']}")
 
                     company_info = {
                         "name":    company_name,

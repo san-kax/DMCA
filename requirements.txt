@@ -1,5 +1,7 @@
-﻿streamlit
-playwright
+streamlit==1.45.0
+requests
 reportlab
 pandas
 python-dotenv
+nest_asyncio
+anyio==3.7.1
