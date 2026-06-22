@@ -39,10 +39,11 @@ def _country_code_from_url(url: str) -> str:
 
 async def _check_url_with_browser(url: str, browser: Browser) -> dict:
     """Check a single URL using an existing browser instance."""
-    # Force English + US results so consent/language pages don't interfere
-    search_url = f"https://www.google.com/search?q=site:{url}&num=10&gl=us&hl=en"
+    # Properly encode the full query so Playwright sends a valid Google search URL
+    query = urllib.parse.quote(f"site:{url}", safe='')
+    search_url = f"https://www.google.com/search?q={query}&num=10&hl=en"
 
-    # Phrases that confirm we got a real search results page
+    # Phrases that confirm we got a real Google search results page
     valid_page_phrases = [
         "did not match any documents",
         "no results found",
@@ -51,7 +52,8 @@ async def _check_url_with_browser(url: str, browser: Browser) -> dict:
         "lumendatabase",
         "about ",                  # "About 1,230 results"
         "results (",               # "results (0.42 seconds)"
-        "site:",                   # search box text echoed in body
+        "did not match",
+        "suggestions:",            # suggestions block on no-results page
     ]
 
     content = ""
