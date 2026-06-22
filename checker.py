@@ -36,38 +36,37 @@ def check_single_url(url: str) -> dict:
             state   = data.get("search_information", {}).get("organic_results_state", "")
             indexed = bool(organic) and "empty" not in state.lower()
 
-            # ── DMCA check — SerpAPI exposes dmca_messages directly ───────────
-            dmca_block = data.get("dmca_messages", {})
-            for msg in dmca_block.get("messages", []):
-                msg_content = msg.get("content", "")
-                lumen_url = None
-                lumen_id  = None
+            # ── DMCA check — only relevant when page is NOT indexed ──────────
+            if not indexed:
+                dmca_block = data.get("dmca_messages", {})
+                for msg in dmca_block.get("messages", []):
+                    msg_content = msg.get("content", "")
+                    lumen_url = None
+                    lumen_id  = None
 
-                # Try highlighted_words first
-                for hw in msg.get("highlighted_words", []):
-                    link = hw.get("link", "")
-                    m = re.search(r'lumendatabase\.org/notices/(\d+)', link)
-                    if m:
-                        lumen_id  = int(m.group(1))
-                        lumen_url = link
-                        break
+                    for hw in msg.get("highlighted_words", []):
+                        link = hw.get("link", "")
+                        m = re.search(r'lumendatabase\.org/notices/(\d+)', link)
+                        if m:
+                            lumen_id  = int(m.group(1))
+                            lumen_url = link
+                            break
 
-                # Fallback: search entire message + raw dmca_block JSON string
-                if lumen_id is None:
-                    raw_dmca = str(dmca_block)
-                    m = re.search(r'lumendatabase\.org/notices/(\d+)', raw_dmca)
-                    if m:
-                        lumen_id  = int(m.group(1))
-                        lumen_url = f"https://lumendatabase.org/notices/{lumen_id}"
+                    if lumen_id is None:
+                        raw_dmca = str(dmca_block)
+                        m = re.search(r'lumendatabase\.org/notices/(\d+)', raw_dmca)
+                        if m:
+                            lumen_id  = int(m.group(1))
+                            lumen_url = f"https://lumendatabase.org/notices/{lumen_id}"
 
-                notices.append({
-                    "id":             lumen_id,
-                    "lumen_url":      lumen_url,
-                    "content":        msg_content,
-                    "recipient_name": "Google LLC",
-                    "affected_url":   url,
-                    "source":         "serpapi_dmca",
-                })
+                    notices.append({
+                        "id":             lumen_id,
+                        "lumen_url":      lumen_url,
+                        "content":        msg_content,
+                        "recipient_name": "Google LLC",
+                        "affected_url":   url,
+                        "source":         "serpapi_dmca",
+                    })
 
     except Exception as exc:
         indexed_error = str(exc)
