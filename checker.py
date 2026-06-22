@@ -18,11 +18,12 @@ def check_single_url(url: str) -> dict:
         resp = requests.get(
             SERPAPI_URL,
             params={
-                "engine":  "google",
-                "q":       f"site:{url}",
-                "num":     10,
-                "api_key": SERPAPI_KEY,
-                "hl":      "en",
+                "engine":   "google",
+                "q":        f"site:{url}",
+                "num":      10,
+                "api_key":  SERPAPI_KEY,
+                "hl":       "en",
+                "no_cache": "true",
             },
             timeout=30,
         )

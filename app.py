@@ -101,7 +101,7 @@ seen: set = set()
 urls = [u for u in urls if not (u in seen or seen.add(u))]
 
 if urls:
-    mins, secs = divmod(len(urls) * 2, 60)
+    mins, secs = divmod(len(urls) * 5, 60)
     st.info(f"**{len(urls)} URLs** ready — estimated time: ~{mins} min {secs} sec")
 
 st.divider()
