@@ -71,7 +71,7 @@ seen: set = set()
 urls = [u for u in urls if not (u in seen or seen.add(u))]
 
 if urls:
-    st.info(f"**{len(urls)} URLs** loaded — estimated time: ~{len(urls) * 5 // 60} min {(len(urls) * 5) % 60} sec")
+    st.info(f"**{len(urls)} URLs** loaded — estimated time: ~{len(urls) * 2 // 60} min {(len(urls) * 2) % 60} sec")
 
 st.divider()
 
