@@ -126,14 +126,28 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
             notice_ids = ", ".join(
                 str(n["id"]) for n in r["notices"] if n.get("id")
             ) or ("Yes" if r["notices"] else "—")
+            # First Lumen URL for the link column
+            lumen_link = next(
+                (n["lumen_url"] for n in r["notices"] if n.get("lumen_url")), ""
+            )
             rows.append({
                 "#":            idx,
                 "URL":          r["url"],
                 "Indexed":      "Yes" if r["indexed"] else "No",
                 "DMCA Notices": notice_ids,
+                "Lumen Link":   lumen_link,
                 "Error":        (r.get("indexed_error") or "")[:80],
             })
-        table_placeholder.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        table_placeholder.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Lumen Link": st.column_config.LinkColumn(
+                    "Lumen Link", display_text="View Notice"
+                )
+            },
+        )
 
     total = len(urls)
     for i, url in enumerate(urls):
