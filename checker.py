@@ -7,31 +7,33 @@ import requests
 SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
 SERPAPI_URL = "https://serpapi.com/search"
 
-# Map URL path segment → Google country code (gl parameter)
+# Map URL path segment → (gl, location) for SerpAPI
+# location pin ensures Google uses the right regional datacenter
 _GEO_MAP = {
-    "/uk/": "gb", "/gb/": "gb",
-    "/ie/": "ie",
-    "/nz/": "nz",
-    "/ca/": "ca",
-    "/au/": "au",
-    "/us/": "us",
-    "/za/": "za",
-    "/in/": "in",
-    "/de/": "de",
-    "/fr/": "fr",
-    "/es/": "es",
-    "/it/": "it",
+    "/uk/": ("gb", "London,England,United Kingdom"),
+    "/gb/": ("gb", "London,England,United Kingdom"),
+    "/ie/": ("ie", "Dublin,County Dublin,Ireland"),
+    "/nz/": ("nz", "Auckland,Auckland,New Zealand"),
+    "/ca/": ("ca", "Toronto,Ontario,Canada"),
+    "/au/": ("au", "Sydney,New South Wales,Australia"),
+    "/us/": ("us", "New York,New York,United States"),
+    "/za/": ("za", "Johannesburg,Gauteng,South Africa"),
+    "/in/": ("in", "Mumbai,Maharashtra,India"),
+    "/de/": ("de", "Berlin,Berlin,Germany"),
+    "/fr/": ("fr", "Paris,Ile-de-France,France"),
+    "/es/": ("es", "Madrid,Community of Madrid,Spain"),
+    "/it/": ("it", "Rome,Lazio,Italy"),
 }
 
-def _geo_for_url(url: str) -> str:
+def _geo_for_url(url: str) -> tuple:
     lower = url.lower()
-    for pattern, gl in _GEO_MAP.items():
+    for pattern, geo in _GEO_MAP.items():
         if pattern in lower:
-            return gl
-    return "us"
+            return geo
+    return ("us", "New York,New York,United States")
 
 
-def _serpapi_query(url: str, gl: str = None) -> dict:
+def _serpapi_query(url: str, gl: str = None, location: str = None) -> dict:
     params = {
         "engine":   "google",
         "q":        f"site:{url}",
@@ -42,6 +44,8 @@ def _serpapi_query(url: str, gl: str = None) -> dict:
     }
     if gl:
         params["gl"] = gl
+    if location:
+        params["location"] = location
     resp = requests.get(SERPAPI_URL, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
@@ -59,9 +63,9 @@ def check_single_url(url: str) -> dict:
     notices = []
 
     try:
-        # First call: geo-targeted
-        gl   = _geo_for_url(url)
-        data = _serpapi_query(url, gl=gl)
+        # First call: geo-targeted with location pin
+        gl, location = _geo_for_url(url)
+        data = _serpapi_query(url, gl=gl, location=location)
 
         if "error" in data:
             indexed_error = data["error"]
