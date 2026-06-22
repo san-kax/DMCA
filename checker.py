@@ -104,17 +104,13 @@ async def _check_url_with_browser(url: str, browser: Browser) -> dict:
     has_dmca_message = any(phrase in text.lower() for phrase in dmca_phrases)
     no_results = any(phrase in text.lower() for phrase in no_results_phrases)
 
-    # Use text (innerText) not content (HTML) — input values don't appear in innerText,
-    # so the search box "site:URL" won't cause false positives, but result breadcrumbs will.
-    text_lower = text.lower()
-    in_results = url_norm in text_lower
-
+    # Indexed = True unless Google explicitly says no results found.
+    # Google truncates breadcrumbs so URL string matching is unreliable.
+    # DMCA pages can be partially indexed (some results remain) or fully removed.
     if no_results:
         indexed = False
-    elif has_dmca_message:
-        indexed = in_results
     else:
-        indexed = in_results
+        indexed = True
 
     if has_dmca_message:
         lumen_ids = list(dict.fromkeys(re.findall(r'lumendatabase\.org/notices/(\d+)', content)))
