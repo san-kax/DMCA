@@ -6,7 +6,6 @@ import requests
 
 SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "deb856bba9367d89e13471cfd7c94f88a26bba5f7cacd9f27e9472421f93c56d")
 SERPAPI_URL = "https://serpapi.com/search"
-LUMEN_URL   = "https://lumendatabase.org/notices/search.json"
 
 
 def check_single_url(url: str) -> dict:
@@ -38,34 +37,30 @@ def check_single_url(url: str) -> dict:
             state   = data.get("search_information", {}).get("organic_results_state", "")
             indexed = bool(organic) and "empty" not in state.lower()
 
+            # ── DMCA check — SerpAPI exposes dmca_messages directly ───────────
+            dmca_block = data.get("dmca_messages", {})
+            for msg in dmca_block.get("messages", []):
+                content = msg.get("content", "")
+                lumen_url = None
+                lumen_id  = None
+                for hw in msg.get("highlighted_words", []):
+                    link = hw.get("link", "")
+                    m = re.search(r'lumendatabase\.org/notices/(\d+)', link)
+                    if m:
+                        lumen_id  = int(m.group(1))
+                        lumen_url = link
+                        break
+                notices.append({
+                    "id":             lumen_id,
+                    "lumen_url":      lumen_url,
+                    "content":        content,
+                    "recipient_name": "Google LLC",
+                    "affected_url":   url,
+                    "source":         "serpapi_dmca",
+                })
+
     except Exception as exc:
         indexed_error = str(exc)
-
-    # ── 2. DMCA check via Lumen Database API ─────────────────────────────────
-    try:
-        lumen_resp = requests.get(
-            LUMEN_URL,
-            params={
-                "works.urls[]": url,
-                "per_page":     10,
-                "sort_by":      "date_sent desc",
-            },
-            headers={"Accept": "application/json"},
-            timeout=20,
-        )
-        if lumen_resp.status_code == 200:
-            for notice in lumen_resp.json().get("notices", []):
-                nid = notice.get("id")
-                notices.append({
-                    "id":             nid,
-                    "lumen_url":      f"https://lumendatabase.org/notices/{nid}" if nid else None,
-                    "content":        notice.get("title", ""),
-                    "recipient_name": notice.get("recipient_name", "Google LLC"),
-                    "affected_url":   url,
-                    "source":         "lumen_api",
-                })
-    except Exception:
-        pass
 
     return {
         "url":           url,
