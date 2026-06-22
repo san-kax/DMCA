@@ -1,0 +1,36 @@
+name: Daily DMCA Check
+
+on:
+  schedule:
+    - cron: "0 9 * * *"   # 09:00 UTC = 10:00 IST/Ireland (BST)
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+jobs:
+  dmca-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests pandas
+
+      - name: Run DMCA check
+        env:
+          SERPAPI_KEY:       ${{ secrets.SERPAPI_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python run_scheduled.py
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dmca-results-${{ github.run_id }}
+          path: "*.csv"
+          retention-days: 30
