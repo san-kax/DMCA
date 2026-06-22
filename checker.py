@@ -7,6 +7,29 @@ import requests
 SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
 SERPAPI_URL = "https://serpapi.com/search"
 
+# Map URL path segment → Google country code (gl parameter)
+_GEO_MAP = {
+    "/uk/": "gb", "/gb/": "gb",
+    "/ie/": "ie",
+    "/nz/": "nz",
+    "/ca/": "ca",
+    "/au/": "au",
+    "/us/": "us",
+    "/za/": "za",
+    "/in/": "in",
+    "/de/": "de",
+    "/fr/": "fr",
+    "/es/": "es",
+    "/it/": "it",
+}
+
+def _geo_for_url(url: str) -> str:
+    lower = url.lower()
+    for pattern, gl in _GEO_MAP.items():
+        if pattern in lower:
+            return gl
+    return "us"
+
 
 def check_single_url(url: str) -> dict:
     indexed = False
@@ -23,6 +46,7 @@ def check_single_url(url: str) -> dict:
                 "num":      10,
                 "api_key":  SERPAPI_KEY,
                 "hl":       "en",
+                "gl":       _geo_for_url(url),
                 "no_cache": "true",
             },
             timeout=30,
