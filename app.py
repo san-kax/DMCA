@@ -8,6 +8,10 @@ import streamlit as st
 
 nest_asyncio.apply()
 
+# ── Load secrets into environment ─────────────────────────────────────────────
+if "SERPAPI_KEY" in st.secrets:
+    os.environ["SERPAPI_KEY"] = st.secrets["SERPAPI_KEY"]
+
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="DMCA Monitor",
@@ -18,6 +22,20 @@ st.set_page_config(
 
 from checker import check_single_url          # noqa: E402
 from counter_notice import generate_counter_notice  # noqa: E402
+
+# ── Password gate ─────────────────────────────────────────────────────────────
+APP_PASSWORD = st.secrets.get("APP_PASSWORD", "")
+if APP_PASSWORD:
+    if not st.session_state.get("authenticated"):
+        st.title("DMCA Monitor")
+        pwd = st.text_input("Enter password", type="password")
+        if st.button("Login"):
+            if pwd == APP_PASSWORD:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("Incorrect password")
+        st.stop()
 
 # ── Sidebar – company info ────────────────────────────────────────────────────
 with st.sidebar:

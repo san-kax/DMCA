@@ -4,7 +4,7 @@ import re
 
 import requests
 
-SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "deb856bba9367d89e13471cfd7c94f88a26bba5f7cacd9f27e9472421f93c56d")
+SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
 SERPAPI_URL = "https://serpapi.com/search"
 
 
