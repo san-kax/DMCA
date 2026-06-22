@@ -104,14 +104,10 @@ async def _check_url_with_browser(url: str, browser: Browser) -> dict:
     has_dmca_message = any(phrase in text.lower() for phrase in dmca_phrases)
     no_results = any(phrase in text.lower() for phrase in no_results_phrases)
 
-    content_lower = content.lower()
-    # Google result links: /url?q=https%3A%2F%2F... or /url?q=https://...
-    url_encoded_full = urllib.parse.quote(url_norm, safe='').lower()   # https%3a%2f%2f...
-    url_encoded_path = urllib.parse.quote(url_norm, safe=':/').lower() # https://www...
-    in_results = (
-        f"q={url_encoded_full}" in content_lower or
-        f"q={url_encoded_path}" in content_lower
-    )
+    # Use text (innerText) not content (HTML) — input values don't appear in innerText,
+    # so the search box "site:URL" won't cause false positives, but result breadcrumbs will.
+    text_lower = text.lower()
+    in_results = url_norm in text_lower
 
     if no_results:
         indexed = False
