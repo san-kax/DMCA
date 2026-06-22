@@ -40,9 +40,11 @@ def check_single_url(url: str) -> dict:
             # ── DMCA check — SerpAPI exposes dmca_messages directly ───────────
             dmca_block = data.get("dmca_messages", {})
             for msg in dmca_block.get("messages", []):
-                content = msg.get("content", "")
+                msg_content = msg.get("content", "")
                 lumen_url = None
                 lumen_id  = None
+
+                # Try highlighted_words first
                 for hw in msg.get("highlighted_words", []):
                     link = hw.get("link", "")
                     m = re.search(r'lumendatabase\.org/notices/(\d+)', link)
@@ -50,10 +52,19 @@ def check_single_url(url: str) -> dict:
                         lumen_id  = int(m.group(1))
                         lumen_url = link
                         break
+
+                # Fallback: search entire message + raw dmca_block JSON string
+                if lumen_id is None:
+                    raw_dmca = str(dmca_block)
+                    m = re.search(r'lumendatabase\.org/notices/(\d+)', raw_dmca)
+                    if m:
+                        lumen_id  = int(m.group(1))
+                        lumen_url = f"https://lumendatabase.org/notices/{lumen_id}"
+
                 notices.append({
                     "id":             lumen_id,
                     "lumen_url":      lumen_url,
-                    "content":        content,
+                    "content":        msg_content,
                     "recipient_name": "Google LLC",
                     "affected_url":   url,
                     "source":         "serpapi_dmca",
