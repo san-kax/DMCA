@@ -103,11 +103,13 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
             notice_ids = ", ".join(
                 str(n["id"]) for n in r["notices"] if n.get("id")
             ) or ("Yes" if r["notices"] else "—")
+            # If indexed AND has DMCA, notice likely targets a sub-page
+            dmca_scope = " (sub-page)" if r["indexed"] and r["notices"] else ""
             rows.append({
                 "#":            idx,
                 "URL":          r["url"],
                 "Indexed":      "Yes" if r["indexed"] else "No",
-                "DMCA Notices": notice_ids,
+                "DMCA Notices": (notice_ids + dmca_scope) if notice_ids != "—" else "—",
                 "Error":        (r.get("indexed_error") or "")[:80],
             })
         table_placeholder.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
@@ -135,6 +137,8 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
         st.error(f"{len(notices_found)} URL(s) have DMCA notices — counter-notices available below.")
         for r in notices_found:
             with st.expander(f"DMCA: {r['url']}"):
+                if r["indexed"]:
+                    st.info("This URL is still indexed — the DMCA notice likely targets a sub-page under this path, not this exact URL.")
                 for notice in r["notices"]:
                     st.write(f"**Lumen Notice ID:** {notice.get('id') or 'N/A'}")
                     if notice.get("lumen_url"):
