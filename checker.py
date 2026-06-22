@@ -42,15 +42,21 @@ async def _check_url_with_browser(url: str, browser: Browser) -> dict:
     # Force English + US results so consent/language pages don't interfere
     search_url = f"https://www.google.com/search?q=site:{url}&num=10&gl=us&hl=en"
 
-    bad_page_phrases = [
-        "before you continue to google",
-        "unusual traffic from your computer",
-        "our systems have detected unusual",
-        "i'm not a robot",
-        "verify you are human",
+    # Phrases that confirm we got a real search results page
+    valid_page_phrases = [
+        "did not match any documents",
+        "no results found",
+        "your search did not match",
+        "in response to",          # DMCA notice
+        "lumendatabase",
+        "about ",                  # "About 1,230 results"
+        "results (",               # "results (0.42 seconds)"
+        "site:",                   # search box text echoed in body
     ]
 
-    for attempt in range(2):
+    content = ""
+    text = ""
+    for attempt in range(3):
         context = await browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -72,14 +78,14 @@ async def _check_url_with_browser(url: str, browser: Browser) -> dict:
         except Exception as e:
             await context.close()
             return {"url": url, "indexed": False, "indexed_error": str(e), "notices": []}
-        finally:
+        else:
             await context.close()
 
-        # Retry if Google served a consent/CAPTCHA page
-        if any(phrase in text.lower() for phrase in bad_page_phrases):
-            if attempt == 0:
-                await asyncio.sleep(3)
-                continue
+        text_l = text.lower()
+        is_valid = any(phrase in text_l for phrase in valid_page_phrases)
+        if not is_valid and attempt < 2:
+            await asyncio.sleep(4)
+            continue
         break
 
     # --- Indexed check ---
