@@ -11,68 +11,76 @@ nest_asyncio.apply()
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="DMCA Monitor",
-    page_icon="shield",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_icon="🛡️",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-# ── Password gate (runs before anything else renders) ─────────────────────────
+# ── Hide sidebar entirely ─────────────────────────────────────────────────────
+st.markdown("""
+<style>
+[data-testid="stSidebar"] { display: none; }
+[data-testid="collapsedControl"] { display: none; }
+.block-container { padding-top: 2rem; max-width: 900px; }
+</style>
+""", unsafe_allow_html=True)
+
+# ── Password gate ─────────────────────────────────────────────────────────────
 try:
     APP_PASSWORD = st.secrets["APP_PASSWORD"]
 except (KeyError, FileNotFoundError):
     APP_PASSWORD = ""
 
 if APP_PASSWORD and not st.session_state.get("authenticated"):
-    st.title("DMCA Monitor")
-    pwd = st.text_input("Enter password", type="password")
-    if st.button("Login"):
-        if pwd == APP_PASSWORD:
-            st.session_state["authenticated"] = True
-            st.rerun()
-        else:
-            st.error("Incorrect password")
+    st.markdown("<h2 style='text-align:center;margin-top:4rem'>🛡️ DMCA Monitor</h2>", unsafe_allow_html=True)
+    col = st.columns([1, 2, 1])[1]
+    with col:
+        pwd = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="Enter password")
+        if st.button("Login", use_container_width=True, type="primary"):
+            if pwd == APP_PASSWORD:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("Incorrect password")
     st.stop()
 
-# ── Load secrets into environment ─────────────────────────────────────────────
+# ── Load secrets ──────────────────────────────────────────────────────────────
 try:
     os.environ["SERPAPI_KEY"] = st.secrets["SERPAPI_KEY"]
 except (KeyError, FileNotFoundError):
     pass
 
-from checker import check_single_url          # noqa: E402
+from checker import check_single_url            # noqa: E402
 from counter_notice import generate_counter_notice  # noqa: E402
 
-# ── Sidebar – company info ────────────────────────────────────────────────────
-with st.sidebar:
-    st.header("Company Info")
-    st.caption("Pre-filled into counter-notice PDFs")
-    company_name    = st.text_input("Company Name",  value="GDC Group")
-    company_address = st.text_input("Address",       value="Fitzwilliam Court 3rd Floor, Leeson Cl, Dublin 2, Ireland")
-    company_phone   = st.text_input("Phone",         value="+353 1 903 8375")
-    company_email   = st.text_input("Email",         value="sandeep.kumar@gdcgroup.com")
-    st.divider()
-    st.caption("Powered by SerpAPI & Lumen Database")
-
 # ── Header ────────────────────────────────────────────────────────────────────
-st.title("DMCA Monitor")
-st.caption("URL Index & Takedown Checker — powered by SerpAPI & Lumen Database")
+st.markdown("## 🛡️ DMCA Monitor")
+st.caption("Check if your URLs are indexed in Google and flag any DMCA takedown notices.")
 
 st.divider()
 
 # ── URL input ─────────────────────────────────────────────────────────────────
-col_upload, col_paste = st.columns([1, 1])
+col_upload, col_paste = st.columns([1, 1], gap="large")
 
 with col_upload:
+    st.markdown("**Upload CSV**")
     uploaded_file = st.file_uploader(
         "Upload CSV",
         type=["csv"],
         help="Any column named url, URL, link, or the first column is used.",
+        label_visibility="collapsed",
     )
 
 with col_paste:
-    manual_urls = st.text_area("Or paste URLs (one per line)", height=120)
+    st.markdown("**Or paste URLs**")
+    manual_urls = st.text_area(
+        "Paste URLs",
+        height=120,
+        placeholder="https://example.com/page-1\nhttps://example.com/page-2",
+        label_visibility="collapsed",
+    )
 
-# Parse URLs from both sources
+# ── Parse URLs ────────────────────────────────────────────────────────────────
 urls: list[str] = []
 
 if uploaded_file:
@@ -89,12 +97,24 @@ if uploaded_file:
 if manual_urls.strip():
     urls += [u.strip() for u in manual_urls.strip().splitlines() if u.strip()]
 
-# Deduplicate preserving order
 seen: set = set()
 urls = [u for u in urls if not (u in seen or seen.add(u))]
 
 if urls:
-    st.info(f"**{len(urls)} URLs** loaded — estimated time: ~{len(urls) * 2 // 60} min {(len(urls) * 2) % 60} sec")
+    mins, secs = divmod(len(urls) * 2, 60)
+    st.info(f"**{len(urls)} URLs** ready — estimated time: ~{mins} min {secs} sec")
+
+st.divider()
+
+# ── Company info (for counter-notice PDFs) ────────────────────────────────────
+with st.expander("Company info for counter-notice PDFs", expanded=False):
+    ci1, ci2 = st.columns(2)
+    with ci1:
+        company_name  = st.text_input("Company Name",  value="GDC Group")
+        company_phone = st.text_input("Phone",         value="+353 1 903 8375")
+    with ci2:
+        company_address = st.text_input("Address", value="Fitzwilliam Court 3rd Floor, Leeson Cl, Dublin 2, Ireland")
+        company_email   = st.text_input("Email",   value="sandeep.kumar@gdcgroup.com")
 
 st.divider()
 
@@ -116,8 +136,8 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
     def refresh_stats():
         indexed = sum(1 for r in results if r["indexed"])
         notices = sum(1 for r in results if r["notices"])
-        box_total.metric("Checked",       len(results))
-        box_indexed.metric("Indexed",     indexed)
+        box_total.metric("Checked",        len(results))
+        box_indexed.metric("Indexed",      indexed)
         box_notices.metric("DMCA Notices", notices)
 
     def refresh_table():
@@ -126,7 +146,6 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
             notice_ids = ", ".join(
                 str(n["id"]) for n in r["notices"] if n.get("id")
             ) or ("Yes" if r["notices"] else "—")
-            # First Lumen URL for the link column
             lumen_link = next(
                 (n["lumen_url"] for n in r["notices"] if n.get("lumen_url")), ""
             )
@@ -134,7 +153,7 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
                 "#":            idx,
                 "URL":          r["url"],
                 "Indexed":      "Yes" if r["indexed"] else "No",
-                "DMCA Notices": notice_ids,
+                "DMCA Notice":  notice_ids,
                 "Lumen Link":   lumen_link,
                 "Error":        (r.get("indexed_error") or "")[:80],
             })
@@ -143,9 +162,7 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Lumen Link": st.column_config.LinkColumn(
-                    "Lumen Link", display_text="View Notice"
-                )
+                "Lumen Link": st.column_config.LinkColumn("Lumen Link", display_text="View Notice"),
             },
         )
 
@@ -154,7 +171,6 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
         status_text.caption(f"Checking: {url}")
         result = check_single_url(url)
         results.append(result)
-
         pct = len(results) / total
         progress_bar.progress(pct, text=f"Checking {len(results)} / {total}...")
         refresh_stats()
@@ -165,34 +181,36 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
 
     st.divider()
 
-    # ── Summary ───────────────────────────────────────────────────────────────
+    # ── DMCA summary ─────────────────────────────────────────────────────────
     notices_found = [r for r in results if r["notices"]]
 
     if notices_found:
-        st.error(f"{len(notices_found)} URL(s) have DMCA notices — counter-notices available below.")
+        st.error(f"**{len(notices_found)} URL(s) have DMCA notices** — generate counter-notices below.")
         for r in notices_found:
-            with st.expander(f"DMCA: {r['url']}"):
+            with st.expander(f"📋 {r['url']}"):
                 for notice in r["notices"]:
-                    st.write(f"**Lumen Notice ID:** {notice.get('id') or 'N/A'}")
-                    if notice.get("lumen_url"):
-                        st.write(f"**Lumen Record:** {notice['lumen_url']}")
-                    if notice.get("content"):
-                        st.write(f"**Notice title:** {notice['content']}")
-
-                    company_info = {
-                        "name":    company_name,
-                        "address": company_address,
-                        "phone":   company_phone,
-                        "email":   company_email,
-                    }
-                    pdf_bytes = generate_counter_notice(notice, company_info)
-                    st.download_button(
-                        label="Download Counter-Notice PDF",
-                        data=pdf_bytes,
-                        file_name=f"counter_notice_{notice.get('id', 'notice')}.pdf",
-                        mime="application/pdf",
-                        key=f"pdf_{r['url']}_{notice.get('id')}",
-                    )
+                    cols = st.columns([1, 1])
+                    with cols[0]:
+                        st.markdown(f"**Notice ID:** {notice.get('id') or 'N/A'}")
+                        if notice.get("content"):
+                            st.markdown(f"**Title:** {notice['content']}")
+                    with cols[1]:
+                        if notice.get("lumen_url"):
+                            st.link_button("View on Lumen Database", notice["lumen_url"])
+                        company_info = {
+                            "name":    company_name,
+                            "address": company_address,
+                            "phone":   company_phone,
+                            "email":   company_email,
+                        }
+                        pdf_bytes = generate_counter_notice(notice, company_info)
+                        st.download_button(
+                            label="Download Counter-Notice PDF",
+                            data=pdf_bytes,
+                            file_name=f"counter_notice_{notice.get('id', 'notice')}.pdf",
+                            mime="application/pdf",
+                            key=f"pdf_{r['url']}_{notice.get('id')}",
+                        )
     else:
         st.success("No DMCA notices found across all URLs.")
 
@@ -216,3 +234,5 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
         mime="text/csv",
         use_container_width=True,
     )
+
+    st.caption("Powered by SerpAPI & Lumen Database")
