@@ -152,7 +152,9 @@ async def _check_url_with_browser(url: str, browser: Browser) -> dict:
                 "source": "google_search_direct",
             })
 
-    return {"url": url, "indexed": indexed, "indexed_error": None, "notices": notices}
+    # DEBUG: capture first 300 chars of page text to surface in UI
+    debug_snippet = text[:300].replace("\n", " ").strip() if text else "(no text)"
+    return {"url": url, "indexed": indexed, "indexed_error": debug_snippet, "notices": notices}
 
 
 async def check_url(url: str, api_key: str = "") -> dict:
