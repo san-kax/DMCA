@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(cd \"C:\\\\Users\\\\SandeepKumar\\\\Downloads\\\\DMCA\"; \\(Get-Content \"static\\\\index.html\"\\) -replace 'Powered by SerpAPI \\\\\\(Google US\\\\\\) &amp; Lumen Database', 'Powered by Google Direct Search &amp; Lumen Database' | Set-Content \"static\\\\index.html\" -Encoding utf8; Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 1; Start-Process python -ArgumentList \"main.py\" -WindowStyle Hidden; Start-Sleep -Seconds 3; Write-Host \"Server restarted\")"
+    ]
+  }
+}
