@@ -39,33 +39,48 @@ def _country_code_from_url(url: str) -> str:
 
 async def _check_url_with_browser(url: str, browser: Browser) -> dict:
     """Check a single URL using an existing browser instance."""
-    # Use google.com for all searches — the real browser's IP determines country
-    # routing already. Country-TLD domains cause rate-limit timeouts under parallel load.
-    search_url = f"https://www.google.com/search?q=site:{url}&num=10"
+    # Force English + US results so consent/language pages don't interfere
+    search_url = f"https://www.google.com/search?q=site:{url}&num=10&gl=us&hl=en"
 
-    context = await browser.new_context(
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/125.0.0.0 Safari/537.36"
-        ),
-        extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
-    )
-    await context.add_init_script(
-        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    )
-    page = await context.new_page()
+    bad_page_phrases = [
+        "before you continue to google",
+        "unusual traffic from your computer",
+        "our systems have detected unusual",
+        "i'm not a robot",
+        "verify you are human",
+    ]
 
-    try:
-        await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(1500)
-        content = await page.content()
-        text = await page.inner_text("body")
-    except Exception as e:
-        await context.close()
-        return {"url": url, "indexed": False, "indexed_error": str(e), "notices": []}
-    finally:
-        await context.close()
+    for attempt in range(2):
+        context = await browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
+        )
+        await context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        )
+        page = await context.new_page()
+
+        try:
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(2000)
+            content = await page.content()
+            text = await page.inner_text("body")
+        except Exception as e:
+            await context.close()
+            return {"url": url, "indexed": False, "indexed_error": str(e), "notices": []}
+        finally:
+            await context.close()
+
+        # Retry if Google served a consent/CAPTCHA page
+        if any(phrase in text.lower() for phrase in bad_page_phrases):
+            if attempt == 0:
+                await asyncio.sleep(3)
+                continue
+        break
 
     # --- Indexed check ---
     url_norm = url.rstrip("/").lower()
@@ -73,24 +88,35 @@ async def _check_url_with_browser(url: str, browser: Browser) -> dict:
         "did not match any documents",
         "no results found",
         "your search did not match",
+        "0 results",
     ]
-    if any(phrase in text.lower() for phrase in no_results_phrases):
-        indexed = False
-    else:
-        indexed = url_norm in content.lower()
 
-    # --- DMCA notice check ---
+    # --- DMCA notice check (independent of indexed status) ---
     notices = []
     dmca_phrases = [
         "in response to a complaint we received under the us digital millennium copyright act",
+        "in response to a complaint that we received under the us digital millennium copyright act",
         "in response to multiple complaints we received under the",
+        "in response to multiple complaints that we received under the",
+        "we have removed",
         "removed from this page",
     ]
     has_dmca_message = any(phrase in text.lower() for phrase in dmca_phrases)
+    no_results = any(phrase in text.lower() for phrase in no_results_phrases)
 
-    if has_dmca_message and not indexed:
-        lumen_ids = re.findall(r'lumendatabase\.org/notices/(\d+)', content)
-        lumen_urls = re.findall(r'(https://lumendatabase\.org/notices/\d+)', content)
+    url_encoded = urllib.parse.quote(url_norm, safe='')
+    in_results = f"q={url_encoded}" in content.lower()
+
+    if no_results:
+        indexed = False
+    elif has_dmca_message:
+        indexed = in_results
+    else:
+        indexed = in_results
+
+    if has_dmca_message:
+        lumen_ids = list(dict.fromkeys(re.findall(r'lumendatabase\.org/notices/(\d+)', content)))
+        lumen_urls = list(dict.fromkeys(re.findall(r'(https://lumendatabase\.org/notices/\d+)', content)))
 
         dmca_text_match = re.search(
             r'(in response to (?:a|multiple) complaint[^<]{0,500})',
@@ -162,7 +188,7 @@ async def check_all_urls(urls: list, site_name: str, api_key: str = "") -> list:
             )
             results.extend(batch_results)
             if i + BATCH_SIZE < len(urls):
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
 
         await browser.close()
     return results

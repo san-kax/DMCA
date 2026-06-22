@@ -1,10 +1,17 @@
 import asyncio
+import os
 import subprocess
 import sys
 from datetime import date
 
+import nest_asyncio
 import pandas as pd
 import streamlit as st
+
+nest_asyncio.apply()
+
+# Pin browser path to /tmp so install and launch always agree on location
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/tmp/ms-playwright"
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -17,9 +24,11 @@ st.set_page_config(
 # ── Install Playwright Chromium on first run (Streamlit Cloud) ───────────────
 @st.cache_resource(show_spinner="Installing browser (first run only)...")
 def install_playwright():
+    env = {**os.environ, "PLAYWRIGHT_BROWSERS_PATH": "/tmp/ms-playwright"}
     subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "chromium", "--with-deps"],
+        [sys.executable, "-m", "playwright", "install", "chromium"],
         capture_output=True,
+        env=env,
     )
 
 install_playwright()
@@ -135,25 +144,23 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
                 ],
             )
             total = len(urls)
-            for i in range(0, total, 2):
-                batch = urls[i : i + 2]
-                batch_results = await asyncio.gather(
-                    *[_check_url_with_browser(url, browser) for url in batch]
-                )
-                results.extend(batch_results)
+            for i, url in enumerate(urls):
+                result = await _check_url_with_browser(url, browser)
+                results.append(result)
 
                 pct = len(results) / total
                 progress_bar.progress(pct, text=f"Checking {len(results)} / {total}...")
-                status_text.caption(f"Last: {batch[-1]}")
+                status_text.caption(f"Last: {url}")
                 refresh_stats()
                 refresh_table()
 
-                if i + 2 < total:
-                    await asyncio.sleep(1)
+                if i + 1 < total:
+                    await asyncio.sleep(3)
 
             await browser.close()
 
-    asyncio.run(run_checks())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run_checks())
 
     progress_bar.progress(1.0, text="Complete!")
     status_text.empty()
