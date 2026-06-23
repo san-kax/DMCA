@@ -144,7 +144,8 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
         rows = []
         for idx, r in enumerate(results, 1):
             notice_ids = ", ".join(
-                str(n["id"]) for n in r["notices"] if n.get("id")
+                str(n["id"]) + ("" if n.get("geo_confirmed", True) else " ⚠️ geo-specific")
+                for n in r["notices"] if n.get("id")
             ) or ("Yes" if r["notices"] else "—")
             lumen_link = next(
                 (n["lumen_url"] for n in r["notices"] if n.get("lumen_url")), ""
@@ -192,6 +193,8 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
                     cols = st.columns([1, 1])
                     with cols[0]:
                         st.markdown(f"**Notice ID:** {notice.get('id') or 'N/A'}")
+                        if not notice.get("geo_confirmed", True):
+                            st.warning("⚠️ Geo-specific notice — page may be indexed globally but removed in a specific region. Verify manually.")
                         if notice.get("content"):
                             st.markdown(f"**Title:** {notice['content']}")
                     with cols[1]:

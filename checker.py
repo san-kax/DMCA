@@ -101,7 +101,12 @@ def check_single_url(url: str) -> dict:
                     indexed = True
                 else:
                     # Both calls agree: not indexed — extract DMCA notices
-                    dmca_block = data.get("dmca_messages", {})
+                    # Check if global call also had dmca_messages for extra confidence
+                    dmca_block  = data.get("dmca_messages", {})
+                    dmca_block2 = data2.get("dmca_messages", {})
+                    # geo_confirmed=True means global call also saw the notice (more reliable)
+                    geo_confirmed = bool(dmca_block2.get("messages"))
+
                     for msg in dmca_block.get("messages", []):
                         msg_content = msg.get("content", "")
                         lumen_url = None
@@ -129,6 +134,7 @@ def check_single_url(url: str) -> dict:
                             "recipient_name": "Google LLC",
                             "affected_url":   url,
                             "source":         "serpapi_dmca",
+                            "geo_confirmed":  geo_confirmed,
                         })
 
     except Exception as exc:

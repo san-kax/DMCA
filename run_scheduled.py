@@ -145,13 +145,15 @@ def run():
     message = "\n".join(summary_lines)
 
     if all_dmca:
-        message += "\n\n*🚨 DMCA Notices Found:*"
+        message += "\n\n*🚨 Notices Found:*"
         for r in all_dmca:
             for n in r["notices"]:
-                nid       = n.get("id", "N/A")
-                lurl      = n.get("lumen_url", "")
-                lumen_txt = f" · <{lurl}|View Notice>" if lurl else ""
-                message += f"\n• `{r['url']}`  →  Notice #{nid}{lumen_txt}"
+                nid           = n.get("id", "N/A")
+                lurl          = n.get("lumen_url", "")
+                geo_confirmed = n.get("geo_confirmed", True)
+                lumen_txt     = f" · <{lurl}|View Notice>" if lurl else ""
+                warning       = "" if geo_confirmed else " ⚠️ _geo-specific — verify manually_"
+                message += f"\n• `{r['url']}`  →  Notice #{nid}{lumen_txt}{warning}"
     else:
         message += "\n\n✅ No DMCA notices found today."
 
