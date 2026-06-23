@@ -25,8 +25,27 @@ _GEO_MAP = {
     "/it/": ("it", "Rome,Lazio,Italy"),
 }
 
+# Domain-level geo detection (checked before path patterns)
+_DOMAIN_GEO_MAP = {
+    ".co.uk":   ("gb", "London,England,United Kingdom"),
+    ".com.au":  ("au", "Sydney,New South Wales,Australia"),
+    ".com.de":  ("de", "Berlin,Berlin,Germany"),
+    ".net.nz":  ("nz", "Auckland,Auckland,New Zealand"),
+    ".bonus.ca":("ca", "Toronto,Ontario,Canada"),
+    ".bonusfinder.ie": ("ie", "Dublin,County Dublin,Ireland"),
+    ".bonusfinder.it": ("it", "Rome,Lazio,Italy"),
+    "bonus.ca": ("ca", "Toronto,Ontario,Canada"),
+    "bonusfinder.ie": ("ie", "Dublin,County Dublin,Ireland"),
+    "bonusfinder.it": ("it", "Rome,Lazio,Italy"),
+}
+
 def _geo_for_url(url: str) -> tuple:
     lower = url.lower()
+    # Check domain-level patterns first
+    for pattern, geo in _DOMAIN_GEO_MAP.items():
+        if pattern in lower:
+            return geo
+    # Then check path-level patterns
     for pattern, geo in _GEO_MAP.items():
         if pattern in lower:
             return geo
