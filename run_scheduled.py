@@ -20,17 +20,20 @@ URLS_DIR          = Path(__file__).parent / "urls"
 
 
 def load_urls(csv_path: Path) -> list[str]:
+    import csv as _csv
     urls = []
-    with open(csv_path, encoding="utf-8") as f:
-        lines = f.read().splitlines()
-    if not lines:
+    with open(csv_path, encoding="utf-8", newline="") as f:
+        reader = _csv.reader(f)
+        rows = list(reader)
+    if not rows:
         return []
-    header = lines[0].strip().lower()
-    start  = 1 if header in ("url", "urls", "link", "links") else 0
-    for line in lines[start:]:
-        u = line.strip()
-        if u:
-            urls.append(u)
+    # Skip header row if first cell looks like a column name
+    start = 1 if rows[0][0].strip().lower() in ("url", "urls", "link", "links") else 0
+    for row in rows[start:]:
+        if row:
+            u = row[0].strip()
+            if u:
+                urls.append(u)
     return urls
 
 
