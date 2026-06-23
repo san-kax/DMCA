@@ -25,6 +25,7 @@ jobs:
         env:
           SERPAPI_KEY:       ${{ secrets.SERPAPI_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN:   ${{ secrets.SLACK_BOT_TOKEN }}
         run: python run_scheduled.py
 
       - name: Upload results as artifact
