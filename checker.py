@@ -70,6 +70,18 @@ def _serpapi_query(url: str, gl: str = None, location: str = None) -> dict:
     return resp.json()
 
 
+def _fetch_lumen_date(lumen_url: str) -> str:
+    """Fetch the sent date from a Lumen Database notice page."""
+    try:
+        resp = requests.get(lumen_url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        m = re.search(r'Sent on\s+([\w]+ \d{1,2},\s*\d{4})', resp.text)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return ""
+
+
 def _is_indexed(data: dict) -> bool:
     organic = data.get("organic_results", [])
     state   = data.get("search_information", {}).get("organic_results_state", "")
@@ -127,6 +139,7 @@ def check_single_url(url: str) -> dict:
                                 lumen_id  = int(m.group(1))
                                 lumen_url = f"https://lumendatabase.org/notices/{lumen_id}"
 
+                        notice_date = _fetch_lumen_date(lumen_url) if lumen_url else ""
                         notices.append({
                             "id":             lumen_id,
                             "lumen_url":      lumen_url,
@@ -135,6 +148,7 @@ def check_single_url(url: str) -> dict:
                             "affected_url":   url,
                             "source":         "serpapi_dmca",
                             "geo_confirmed":  geo_confirmed,
+                            "notice_date":    notice_date,
                         })
 
     except Exception as exc:

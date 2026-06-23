@@ -193,6 +193,8 @@ if st.button("Check URLs", type="primary", disabled=not bool(urls), use_containe
                     cols = st.columns([1, 1])
                     with cols[0]:
                         st.markdown(f"**Notice ID:** {notice.get('id') or 'N/A'}")
+                        if notice.get("notice_date"):
+                            st.markdown(f"**Date:** {notice['notice_date']}")
                         if not notice.get("geo_confirmed", True):
                             st.warning("⚠️ Geo-specific notice — page may be indexed globally but removed in a specific region. Verify manually.")
                         if notice.get("content"):

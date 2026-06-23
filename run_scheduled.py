@@ -151,9 +151,11 @@ def run():
                 nid           = n.get("id", "N/A")
                 lurl          = n.get("lumen_url", "")
                 geo_confirmed = n.get("geo_confirmed", True)
+                notice_date   = n.get("notice_date", "")
                 lumen_txt     = f" · <{lurl}|View Notice>" if lurl else ""
+                date_txt      = f" · {notice_date}" if notice_date else ""
                 warning       = "" if geo_confirmed else " ⚠️ _geo-specific — verify manually_"
-                message += f"\n• `{r['url']}`  →  Notice #{nid}{lumen_txt}{warning}"
+                message += f"\n• `{r['url']}`  →  Notice #{nid}{lumen_txt}{date_txt}{warning}"
     else:
         message += "\n\n✅ No DMCA notices found today."
 
