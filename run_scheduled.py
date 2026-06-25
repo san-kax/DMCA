@@ -135,29 +135,59 @@ def run():
         indexed  = sum(1 for r in results if r["indexed"])
         dmca_hit = [r for r in results if r["notices"]]
 
-        summary_lines.append(
-            f"*{site_name}* — {len(urls)} checked · {indexed} indexed · {len(dmca_hit)} DMCA"
-        )
+        # Split into copyright vs legal/geo for summary count
+        copyright_hit = [r for r in dmca_hit if any(
+            n.get("notice_type") == "DMCA Copyright" for n in r["notices"]
+        )]
+        legal_hit = [r for r in dmca_hit if all(
+            n.get("notice_type") != "DMCA Copyright" for n in r["notices"]
+        )]
+
+        summary_parts = f"{len(urls)} checked · {indexed} indexed"
+        if copyright_hit:
+            summary_parts += f" · *{len(copyright_hit)} DMCA Copyright*"
+        if legal_hit:
+            summary_parts += f" · {len(legal_hit)} Legal/Geo"
+        if not copyright_hit and not legal_hit:
+            summary_parts += " · 0 notices"
+
+        summary_lines.append(f"*{site_name}* — {summary_parts}")
         all_dmca.extend(dmca_hit)
         all_results.extend(results)
+
+    # Split all notices into copyright vs legal/geo
+    all_copyright = [
+        (r, n) for r in all_dmca for n in r["notices"]
+        if n.get("notice_type") == "DMCA Copyright"
+    ]
+    all_legal = [
+        (r, n) for r in all_dmca for n in r["notices"]
+        if n.get("notice_type") != "DMCA Copyright"
+    ]
 
     # Build and post Slack summary message
     message = "\n".join(summary_lines)
 
-    if all_dmca:
-        message += "\n\n*🚨 Notices Found:*"
-        for r in all_dmca:
-            for n in r["notices"]:
-                nid           = n.get("id", "N/A")
-                lurl          = n.get("lumen_url", "")
-                geo_confirmed = n.get("geo_confirmed", True)
-                notice_type   = n.get("notice_type", "")
-                lumen_txt     = f" · <{lurl}|View Notice>" if lurl else ""
-                type_txt      = f" · _{notice_type}_" if notice_type else ""
-                warning       = "" if geo_confirmed else " ⚠️ _geo-specific — verify manually_"
-                message += f"\n• `{r['url']}`  →  Notice #{nid}{lumen_txt}{type_txt}{warning}"
+    if all_copyright:
+        message += "\n\n*🚨 DMCA Copyright Notices — Action Required:*"
+        for r, n in all_copyright:
+            nid      = n.get("id", "N/A")
+            lurl     = n.get("lumen_url", "")
+            lumen_txt = f" · <{lurl}|View Notice>" if lurl else ""
+            message += f"\n• `{r['url']}`  →  Notice #{nid}{lumen_txt}"
     else:
-        message += "\n\n✅ No DMCA notices found today."
+        message += "\n\n✅ No DMCA copyright notices today."
+
+    if all_legal:
+        message += f"\n\n*ℹ️ Legal/Geo Notices — {len(all_legal)} found (no action needed):*"
+        for r, n in all_legal:
+            nid          = n.get("id", "N/A")
+            lurl         = n.get("lumen_url", "")
+            notice_type  = n.get("notice_type", "Legal Notice")
+            geo_confirmed = n.get("geo_confirmed", True)
+            lumen_txt    = f" · <{lurl}|View Notice>" if lurl else ""
+            warning      = " ⚠️ geo-specific" if not geo_confirmed else ""
+            message += f"\n• `{r['url']}`  →  #{nid} · _{notice_type}_{warning}{lumen_txt}"
 
     print("\n── Slack message ──")
     print(message)
