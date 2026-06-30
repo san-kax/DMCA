@@ -140,7 +140,8 @@ def _gsc_is_indexed(result: dict) -> bool:
 
 # ── SerpAPI ───────────────────────────────────────────────────────────────────
 
-def _serpapi_query(url: str, gl: str = None, location: str = None) -> dict:
+def _serpapi_query(url: str, gl: str = None, location: str = None, retries: int = 2) -> dict:
+    import time
     params = {
         "engine":   "google",
         "q":        f"site:{url}",
@@ -153,9 +154,15 @@ def _serpapi_query(url: str, gl: str = None, location: str = None) -> dict:
         params["gl"] = gl
     if location:
         params["location"] = location
-    resp = requests.get(SERPAPI_URL, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    for attempt in range(retries):
+        resp = requests.get(SERPAPI_URL, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        if _is_indexed(data):
+            return data
+        if attempt < retries - 1:
+            time.sleep(5)
+    return data
 
 
 def _is_indexed(data: dict) -> bool:
