@@ -49,9 +49,10 @@ _DOMAIN_GEO_MAP = {
     "bonus.ca":        ("ca", "Toronto,Ontario,Canada"),
     "bonusfinder.ie":  ("ie", "Dublin,County Dublin,Ireland"),
     "bonusfinder.it":  ("it", "Rome,Lazio,Italy"),
-    "nettikasinot.com":("fi", "Helsinki,Uusimaa,Finland"),
-    "vedonlyonti.com": ("fi", "Helsinki,Uusimaa,Finland"),
-    "svenskacasino.se":("se", "Stockholm,Stockholm,Sweden"),
+    "nettikasinot.com": ("fi", "Helsinki,Uusimaa,Finland"),
+    "vedonlyonti.com":  ("fi", "Helsinki,Uusimaa,Finland"),
+    "svenskacasino.se": ("se", "Stockholm,Stockholm,Sweden"),
+    "freebets.com":     ("gb", "London,England,United Kingdom"),
 }
 
 
