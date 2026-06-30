@@ -23,20 +23,27 @@ _GEO_MAP = {
     "/fr/": ("fr", "Paris,Ile-de-France,France"),
     "/es/": ("es", "Madrid,Community of Madrid,Spain"),
     "/it/": ("it", "Rome,Lazio,Italy"),
+    "/fi/": ("fi", "Helsinki,Uusimaa,Finland"),
+    "/se/": ("se", "Stockholm,Stockholm,Sweden"),
+    "/no/": ("no", "Oslo,Oslo,Norway"),
+    "/dk/": ("dk", "Copenhagen,Capital Region,Denmark"),
 }
 
 # Domain-level geo detection (checked before path patterns)
 _DOMAIN_GEO_MAP = {
-    ".co.uk":   ("gb", "London,England,United Kingdom"),
-    ".com.au":  ("au", "Sydney,New South Wales,Australia"),
-    ".com.de":  ("de", "Berlin,Berlin,Germany"),
-    ".net.nz":  ("nz", "Auckland,Auckland,New Zealand"),
-    ".bonus.ca":("ca", "Toronto,Ontario,Canada"),
+    ".co.uk":          ("gb", "London,England,United Kingdom"),
+    ".com.au":         ("au", "Sydney,New South Wales,Australia"),
+    ".com.de":         ("de", "Berlin,Berlin,Germany"),
+    ".net.nz":         ("nz", "Auckland,Auckland,New Zealand"),
+    ".bonus.ca":       ("ca", "Toronto,Ontario,Canada"),
     ".bonusfinder.ie": ("ie", "Dublin,County Dublin,Ireland"),
     ".bonusfinder.it": ("it", "Rome,Lazio,Italy"),
-    "bonus.ca": ("ca", "Toronto,Ontario,Canada"),
-    "bonusfinder.ie": ("ie", "Dublin,County Dublin,Ireland"),
-    "bonusfinder.it": ("it", "Rome,Lazio,Italy"),
+    "bonus.ca":        ("ca", "Toronto,Ontario,Canada"),
+    "bonusfinder.ie":  ("ie", "Dublin,County Dublin,Ireland"),
+    "bonusfinder.it":  ("it", "Rome,Lazio,Italy"),
+    "nettikasinot.com":("fi", "Helsinki,Uusimaa,Finland"),
+    "vedonlyonti.com": ("fi", "Helsinki,Uusimaa,Finland"),
+    "svenskacasino.se":("se", "Stockholm,Stockholm,Sweden"),
 }
 
 def _geo_for_url(url: str) -> tuple:
