@@ -12,8 +12,24 @@ GSC_CLIENT_SECRET = os.environ.get("GSC_CLIENT_SECRET", "")
 GSC_REFRESH_TOKEN = os.environ.get("GSC_REFRESH_TOKEN", "")
 
 # Domains where we use GSC URL Inspection API for indexing checks.
-# Must be verified properties in Search Console under the same Google account.
-GSC_DOMAINS = {"gambling.com", "casinos.com"}
+# Maps registered domain → GSC siteUrl (sc-domain: for domain properties,
+# https://www. for URL-prefix properties).
+GSC_DOMAIN_MAP = {
+    "gambling.com":      "https://www.gambling.com/",
+    "casinos.com":       "https://www.casinos.com/",
+    "bonusfinder.com":   "sc-domain:bonusfinder.com",
+    "bonusfinder.co.uk": "sc-domain:bonusfinder.co.uk",
+    "bonus.ca":          "sc-domain:bonus.ca",
+    "bonus.net.nz":      "sc-domain:bonus.net.nz",
+    "bonus.com.de":      "sc-domain:bonus.com.de",
+    "bookies.com":       "sc-domain:bookies.com",
+    "freebets.com":      "sc-domain:freebets.com",
+    "nettikasinot.com":  "sc-domain:nettikasinot.com",
+    "rotowire.com":      "sc-domain:rotowire.com",
+    "vedonlyonti.com":   "sc-domain:vedonlyonti.com",
+    "whichbingo.co.uk":  "sc-domain:whichbingo.co.uk",
+    "svenskacasino.se":  "https://svenskacasino.se/",
+}
 
 # Map URL path segment → (gl, location) for SerpAPI
 # location pin ensures Google uses the right regional datacenter
@@ -57,15 +73,27 @@ _DOMAIN_GEO_MAP = {
 
 
 def _domain_of(url: str) -> str:
-    """Return the registered domain (e.g. gambling.com) from a URL."""
+    """Return the hostname without www. prefix."""
     host = url.lower().split("//")[-1].split("/")[0].split("?")[0]
     host = host.lstrip("www.")
     return host
 
 
-def _use_gsc(url: str) -> bool:
+def _gsc_site_url(url: str) -> str:
+    """Return the GSC siteUrl for this URL, or None if not in GSC_DOMAIN_MAP."""
     domain = _domain_of(url)
-    return any(domain == d or domain.endswith("." + d) for d in GSC_DOMAINS)
+    # Exact match first
+    if domain in GSC_DOMAIN_MAP:
+        return GSC_DOMAIN_MAP[domain]
+    # Check if host ends with a mapped domain (e.g. fi.nettikasinot.com -> nettikasinot.com)
+    for d, site_url in GSC_DOMAIN_MAP.items():
+        if domain.endswith("." + d):
+            return site_url
+    return None
+
+
+def _use_gsc(url: str) -> bool:
+    return _gsc_site_url(url) is not None
 
 
 def _geo_for_url(url: str) -> tuple:
@@ -104,9 +132,7 @@ def _get_gsc_access_token() -> str:
 
 def _gsc_inspect(url: str) -> dict:
     """Call GSC URL Inspection API and return the inspection result dict."""
-    domain = _domain_of(url)
-    # GSC property must match exactly as verified — try https:// prefix first
-    site_url = f"https://www.{domain}/"
+    site_url = _gsc_site_url(url)
     token = _get_gsc_access_token()
     resp = requests.post(
         "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect",
