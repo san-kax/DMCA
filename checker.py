@@ -162,12 +162,14 @@ def _gsc_is_indexed(result: dict) -> bool:
               .get("indexStatusResult", {})
               .get("verdict", "")
     )
-    return verdict == "PASS"
+    # PASS = indexed. NEUTRAL = crawled but no indexing issues (treat as indexed).
+    # Only FAIL means Google has explicitly excluded the page.
+    return verdict in ("PASS", "NEUTRAL")
 
 
 # ── SerpAPI ───────────────────────────────────────────────────────────────────
 
-def _serpapi_query(url: str, gl: str = None, location: str = None, retries: int = 2) -> dict:
+def _serpapi_query(url: str, gl: str = None, location: str = None, retries: int = 3) -> dict:
     import time
     params = {
         "engine":   "google",
