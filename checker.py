@@ -256,14 +256,15 @@ def check_single_url(url: str) -> dict:
             result  = _gsc_inspect(url)
             indexed = _gsc_is_indexed(result)
             if not indexed:
-                # Page is not indexed. Use SerpAPI only to check for DMCA notices.
+                # GSC says not indexed. Confirm with SerpAPI before accepting.
                 gl, location = _geo_for_url(url)
                 data  = _serpapi_query(url, gl=gl, location=location)
                 data2 = _serpapi_query(url, gl=None)
                 if _is_indexed(data) or _is_indexed(data2):
-                    # SerpAPI disagrees — trust GSC, mark as not indexed but no notice
-                    pass
+                    # SerpAPI finds it — override GSC FAIL, treat as indexed
+                    indexed = True
                 else:
+                    # Both GSC and SerpAPI agree not indexed — check for DMCA notices
                     dmca_block  = data.get("dmca_messages", {})
                     dmca_block2 = data2.get("dmca_messages", {})
                     if dmca_block.get("messages"):
