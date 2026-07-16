@@ -245,6 +245,32 @@ def _extract_notices(dmca_block: dict, dmca_block2: dict, url: str) -> list:
 
 # ── Main check ────────────────────────────────────────────────────────────────
 
+def _check_via_serpapi(url: str) -> dict:
+    """Check indexing and DMCA notices using SerpAPI with geo targeting."""
+    indexed = False
+    indexed_error = None
+    notices = []
+    try:
+        gl, location = _geo_for_url(url)
+        data = _serpapi_query(url, gl=gl, location=location)
+        if "error" in data:
+            indexed_error = data["error"]
+        else:
+            indexed = _is_indexed(data)
+            if not indexed:
+                data2 = _serpapi_query(url, gl=None)
+                if _is_indexed(data2):
+                    indexed = True
+                else:
+                    dmca_block  = data.get("dmca_messages", {})
+                    dmca_block2 = data2.get("dmca_messages", {})
+                    if dmca_block.get("messages"):
+                        notices = _extract_notices(dmca_block, dmca_block2, url)
+    except Exception as exc:
+        indexed_error = str(exc)
+    return {"url": url, "indexed": indexed, "indexed_error": indexed_error, "notices": notices}
+
+
 def check_single_url(url: str) -> dict:
     indexed = False
     indexed_error = None
@@ -252,41 +278,30 @@ def check_single_url(url: str) -> dict:
 
     try:
         if _use_gsc(url) and GSC_CLIENT_ID and GSC_REFRESH_TOKEN:
-            # GSC URL Inspection for owned properties (gambling.com, casinos.com)
-            result  = _gsc_inspect(url)
-            indexed = _gsc_is_indexed(result)
+            try:
+                result  = _gsc_inspect(url)
+                indexed = _gsc_is_indexed(result)
+            except Exception as gsc_err:
+                # GSC call failed — fall back to SerpAPI entirely
+                print(f"  GSC error for {url}: {gsc_err} — falling back to SerpAPI")
+                return _check_via_serpapi(url)
+
             if not indexed:
                 # GSC says not indexed. Confirm with SerpAPI before accepting.
                 gl, location = _geo_for_url(url)
                 data  = _serpapi_query(url, gl=gl, location=location)
                 data2 = _serpapi_query(url, gl=None)
                 if _is_indexed(data) or _is_indexed(data2):
-                    # SerpAPI finds it — override GSC FAIL, treat as indexed
+                    # SerpAPI finds it — override GSC, mark as indexed
                     indexed = True
                 else:
-                    # Both GSC and SerpAPI agree not indexed — check for DMCA notices
+                    # Both agree not indexed — check for DMCA notices
                     dmca_block  = data.get("dmca_messages", {})
                     dmca_block2 = data2.get("dmca_messages", {})
                     if dmca_block.get("messages"):
                         notices = _extract_notices(dmca_block, dmca_block2, url)
         else:
-            # SerpAPI for all other sites
-            gl, location = _geo_for_url(url)
-            data = _serpapi_query(url, gl=gl, location=location)
-            if "error" in data:
-                indexed_error = data["error"]
-            else:
-                indexed = _is_indexed(data)
-                if not indexed:
-                    data2    = _serpapi_query(url, gl=None)
-                    indexed2 = _is_indexed(data2)
-                    if indexed2:
-                        indexed = True
-                    else:
-                        dmca_block  = data.get("dmca_messages", {})
-                        dmca_block2 = data2.get("dmca_messages", {})
-                        if dmca_block.get("messages"):
-                            notices = _extract_notices(dmca_block, dmca_block2, url)
+            return _check_via_serpapi(url)
 
     except Exception as exc:
         indexed_error = str(exc)

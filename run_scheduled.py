@@ -46,47 +46,64 @@ def post_to_slack(message: str):
         print(f"Slack webhook error: {resp.status_code} {resp.text}")
 
 
-def upload_csv_to_slack(csv_bytes: bytes, filename: str, title: str):
+def upload_csv_to_slack(csv_bytes: bytes, filename: str, title: str) -> bool:
+    """Upload CSV to Slack. Returns True on success, False on any failure."""
     if not SLACK_BOT_TOKEN:
         print("No SLACK_BOT_TOKEN set — skipping CSV upload")
-        return
+        return False
 
-    # Step 1: get upload URL
-    resp = requests.post(
-        "https://slack.com/api/files.getUploadURLExternal",
-        headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
-        json={"filename": filename, "length": len(csv_bytes)},
-        timeout=15,
-    )
-    data = resp.json()
-    if not data.get("ok"):
-        print(f"Slack getUploadURL error: {data}")
-        return
+    try:
+        # Step 1: get upload URL
+        resp = requests.post(
+            "https://slack.com/api/files.getUploadURLExternal",
+            headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+            data={"filename": filename, "length": len(csv_bytes)},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("ok"):
+            err = data.get("error", str(data))
+            print(f"Slack getUploadURL error: {err}")
+            post_to_slack(f":warning: DMCA report CSV upload failed (getUploadURL): `{err}`")
+            return False
 
-    upload_url = data["upload_url"]
-    file_id    = data["file_id"]
+        upload_url = data["upload_url"]
+        file_id    = data["file_id"]
 
-    # Step 2: upload file content
-    resp = requests.post(upload_url, data=csv_bytes, timeout=30)
-    if resp.status_code != 200:
-        print(f"Slack upload error: {resp.status_code} {resp.text}")
-        return
+        # Step 2: upload file content
+        resp = requests.put(upload_url, data=csv_bytes, timeout=30)
+        if resp.status_code not in (200, 201):
+            err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            print(f"Slack upload error: {err}")
+            post_to_slack(f":warning: DMCA report CSV upload failed (PUT): `{err}`")
+            return False
 
-    # Step 3: complete upload and share to channel
-    resp = requests.post(
-        "https://slack.com/api/files.completeUploadExternal",
-        headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
-        json={
-            "files": [{"id": file_id, "title": title}],
-            "channel_id": SLACK_CHANNEL_ID,
-        },
-        timeout=15,
-    )
-    data = resp.json()
-    if not data.get("ok"):
-        print(f"Slack completeUpload error: {data}")
-    else:
+        # Step 3: complete upload and share to channel
+        resp = requests.post(
+            "https://slack.com/api/files.completeUploadExternal",
+            headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+            json={
+                "files": [{"id": file_id, "title": title}],
+                "channel_id": SLACK_CHANNEL_ID,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("ok"):
+            err = data.get("error", str(data))
+            print(f"Slack completeUpload error: {err}")
+            post_to_slack(f":warning: DMCA report CSV upload failed (completeUpload): `{err}`")
+            return False
+
         print(f"CSV uploaded to Slack: {filename}")
+        return True
+
+    except Exception as exc:
+        print(f"Slack CSV upload exception: {exc}")
+        post_to_slack(f":warning: DMCA report CSV upload exception: `{exc}`")
+        return False
 
 
 def build_csv(all_results: list[dict]) -> bytes:
