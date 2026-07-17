@@ -38,12 +38,42 @@ def load_urls(csv_path: Path) -> list[str]:
 
 
 def post_to_slack(message: str):
-    if not SLACK_WEBHOOK:
-        print("No SLACK_WEBHOOK_URL set — skipping Slack post")
+    """Post a message to the channel. Prefers a valid incoming webhook;
+    falls back to the bot token (chat.postMessage) if no usable webhook is set."""
+    # Preferred path: incoming webhook (needs no extra Slack scope)
+    if SLACK_WEBHOOK.startswith(("http://", "https://")):
+        try:
+            resp = requests.post(SLACK_WEBHOOK, json={"text": message}, timeout=10)
+            if resp.status_code != 200:
+                print(f"Slack webhook error: {resp.status_code} {resp.text}")
+            return
+        except Exception as exc:
+            print(f"Slack webhook exception: {exc}")
+            # fall through to bot-token attempt below
+
+    if SLACK_WEBHOOK and not SLACK_WEBHOOK.startswith(("http://", "https://")):
+        print(
+            "SLACK_WEBHOOK_URL is malformed (missing http:// or https:// scheme) "
+            "— trying bot token instead. Fix the GitHub secret."
+        )
+
+    # Fallback path: bot token via chat.postMessage (needs chat:write scope)
+    if SLACK_BOT_TOKEN:
+        try:
+            resp = requests.post(
+                "https://slack.com/api/chat.postMessage",
+                headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+                json={"channel": SLACK_CHANNEL_ID, "text": message},
+                timeout=10,
+            )
+            data = resp.json()
+            if not data.get("ok"):
+                print(f"Slack chat.postMessage error: {data.get('error', data)}")
+        except Exception as exc:
+            print(f"Slack post exception: {exc}")
         return
-    resp = requests.post(SLACK_WEBHOOK, json={"text": message}, timeout=10)
-    if resp.status_code != 200:
-        print(f"Slack webhook error: {resp.status_code} {resp.text}")
+
+    print("No usable SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN set — skipping Slack post")
 
 
 def upload_csv_to_slack(csv_bytes: bytes, filename: str, title: str) -> bool:
