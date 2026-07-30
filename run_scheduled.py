@@ -240,11 +240,17 @@ def run():
     print(message)
     post_to_slack(message)
 
-    # Upload full CSV report to Slack
+    # Save CSV to disk (picked up by GitHub Actions artifact upload)
+    csv_filename = f"dmca_report_{today_fn}.csv"
     csv_bytes = build_csv(all_results)
+    with open(csv_filename, "wb") as f:
+        f.write(csv_bytes)
+    print(f"CSV saved: {csv_filename}")
+
+    # Upload full CSV report to Slack
     upload_csv_to_slack(
         csv_bytes,
-        filename=f"dmca_report_{today_fn}.csv",
+        filename=csv_filename,
         title=f"DMCA Monitor Full Report — {today}",
     )
 
