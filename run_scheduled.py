@@ -102,11 +102,17 @@ def upload_csv_to_slack(csv_bytes: bytes, filename: str, title: str) -> bool:
         file_id    = data["file_id"]
 
         # Step 2: upload file content
-        resp = requests.put(upload_url, data=csv_bytes, timeout=30)
+        resp = requests.post(
+            upload_url,
+            data=csv_bytes,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        print(f"Slack upload response: {resp.status_code} {resp.text[:200]}")
         if resp.status_code not in (200, 201):
             err = f"HTTP {resp.status_code}: {resp.text[:200]}"
             print(f"Slack upload error: {err}")
-            post_to_slack(f":warning: DMCA report CSV upload failed (PUT): `{err}`")
+            post_to_slack(f":warning: DMCA report CSV upload failed (step2): `{err}`")
             return False
 
         # Step 3: complete upload and share to channel
@@ -121,6 +127,7 @@ def upload_csv_to_slack(csv_bytes: bytes, filename: str, title: str) -> bool:
         )
         resp.raise_for_status()
         data = resp.json()
+        print(f"Slack completeUpload response: {data}")
         if not data.get("ok"):
             err = data.get("error", str(data))
             print(f"Slack completeUpload error: {err}")
