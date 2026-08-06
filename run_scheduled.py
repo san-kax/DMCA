@@ -5,12 +5,16 @@ import csv
 import io
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
 
 import requests
 
 from checker import check_single_url
+
+# Max parallel URL checks — keeps SerpAPI/GSC request rate sane
+MAX_WORKERS = 5
 
 SERPAPI_KEY       = os.environ.get("SERPAPI_KEY", "")
 SLACK_WEBHOOK     = os.environ.get("SLACK_WEBHOOK_URL", "")
@@ -179,12 +183,15 @@ def run():
             continue
 
         print(f"\n── {site_name}: {len(urls)} URLs")
-        results = []
-        for url in urls:
-            result = check_single_url(url)
-            results.append(result)
-            status = "DMCA" if result["notices"] else ("indexed" if result["indexed"] else "not indexed")
-            print(f"  {status:12} {url}")
+        results = [None] * len(urls)
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            futures = {pool.submit(check_single_url, url): i for i, url in enumerate(urls)}
+            for future in as_completed(futures):
+                i = futures[future]
+                result = future.result()
+                results[i] = result
+                status = "DMCA" if result["notices"] else ("indexed" if result["indexed"] else "not indexed")
+                print(f"  {status:12} {result['url']}")
 
         indexed  = sum(1 for r in results if r["indexed"])
         dmca_hit = [r for r in results if r["notices"]]

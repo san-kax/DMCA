@@ -184,7 +184,7 @@ def _serpapi_query(url: str, gl: str = None, location: str = None, retries: int 
     if location:
         params["location"] = location
     for attempt in range(retries):
-        resp = requests.get(SERPAPI_URL, params=params, timeout=30)
+        resp = requests.get(SERPAPI_URL, params=params, timeout=60)
         resp.raise_for_status()
         data = resp.json()
         if _is_indexed(data):
