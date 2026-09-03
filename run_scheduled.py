@@ -232,10 +232,15 @@ def run():
     if all_copyright:
         message += "\n\n*🚨 DMCA Copyright Notices — Action Required:*"
         for r, n in all_copyright:
-            nid      = n.get("id", "N/A")
-            lurl     = n.get("lumen_url", "")
-            lumen_txt = f" · <{lurl}|View Notice>" if lurl else ""
-            message += f"\n• `{r['url']}`  →  Notice #{nid}{lumen_txt}"
+            nid  = n.get("id")
+            lurl = n.get("lumen_url", "")
+            if nid and lurl:
+                notice_txt = f"Notice #{nid} · <{lurl}|View Notice>"
+            elif nid:
+                notice_txt = f"Notice #{nid}"
+            else:
+                notice_txt = "DMCA notice detected (no Lumen ID — check manually)"
+            message += f"\n• `{r['url']}`  →  {notice_txt}"
     else:
         message += "\n\n✅ No DMCA copyright notices today."
 
