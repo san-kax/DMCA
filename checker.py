@@ -245,15 +245,28 @@ def _extract_notices(dmca_block: dict, dmca_block2: dict, url: str) -> list:
 
 # ── Main check ────────────────────────────────────────────────────────────────
 
+def _serpapi_single(url: str, gl: str = None, location: str = None) -> tuple:
+    """Run one SerpAPI check. Returns (indexed, timed_out, data)."""
+    try:
+        data = _serpapi_query(url, gl=gl, location=location)
+        return _is_indexed(data), False, data
+    except Exception as exc:
+        timed_out = "timed out" in str(exc).lower() or "read timeout" in str(exc).lower()
+        return False, timed_out, {}
+
+
 def _serpapi_triple_check(url: str) -> tuple:
     """Run 3 SerpAPI checks: geo-targeted, US, and global (no gl).
-    Returns (indexed: bool, data, data2, data3) where data is the geo result."""
+    If ALL 3 time out we cannot determine status — treat as indexed (benefit of the doubt).
+    Returns (indexed: bool, timed_out: bool, data, data2, data3)."""
     gl, location = _geo_for_url(url)
-    data  = _serpapi_query(url, gl=gl, location=location)   # 1: local geo
-    data2 = _serpapi_query(url, gl="us")                    # 2: US datacenter
-    data3 = _serpapi_query(url, gl=None)                    # 3: global / no gl
-    indexed = _is_indexed(data) or _is_indexed(data2) or _is_indexed(data3)
-    return indexed, data, data2, data3
+    indexed1, to1, data  = _serpapi_single(url, gl=gl, location=location)
+    indexed2, to2, data2 = _serpapi_single(url, gl="us")
+    indexed3, to3, data3 = _serpapi_single(url, gl=None)
+
+    all_timed_out = to1 and to2 and to3
+    indexed = indexed1 or indexed2 or indexed3 or all_timed_out
+    return indexed, all_timed_out, data, data2, data3
 
 
 def _check_via_serpapi(url: str) -> dict:
@@ -262,8 +275,10 @@ def _check_via_serpapi(url: str) -> dict:
     indexed_error = None
     notices = []
     try:
-        indexed, data, data2, data3 = _serpapi_triple_check(url)
-        if not indexed:
+        indexed, all_timed_out, data, data2, data3 = _serpapi_triple_check(url)
+        if all_timed_out:
+            indexed_error = "SerpAPI timeout — assumed indexed"
+        elif not indexed:
             dmca_block  = data.get("dmca_messages", {})
             dmca_block2 = data2.get("dmca_messages", {})
             if dmca_block.get("messages"):
@@ -290,9 +305,13 @@ def check_single_url(url: str) -> dict:
 
             if not indexed:
                 # GSC says not indexed. Confirm with all 3 SerpAPI checks before accepting.
-                indexed, data, data2, data3 = _serpapi_triple_check(url)
-                if not indexed:
-                    # All 3 SerpAPI checks agree not indexed — look for DMCA notices
+                indexed, all_timed_out, data, data2, data3 = _serpapi_triple_check(url)
+                if all_timed_out:
+                    # Can't confirm — treat as indexed (benefit of the doubt)
+                    indexed = True
+                    indexed_error = "SerpAPI timeout — assumed indexed"
+                elif not indexed:
+                    # All agree not indexed — look for DMCA notices
                     dmca_block  = data.get("dmca_messages", {})
                     dmca_block2 = data2.get("dmca_messages", {})
                     if dmca_block.get("messages"):
